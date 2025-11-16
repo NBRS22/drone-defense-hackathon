@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/mission.dart';
 import '../services/api_service.dart';
+import '../widgets/gps_point_selector.dart';
 
 class AddMissionPage extends StatefulWidget {
   const AddMissionPage({super.key});
@@ -434,162 +435,97 @@ class _AddMissionPageState extends State<AddMissionPage> {
   }
 
   Widget _buildLocationSection() {
-    return _buildSection(
-      'Coordonnées GPS',
-      Icons.map_rounded,
-      const Color(0xFF7C3AED),
-      [
-        const Text(
-          'Définissez les points de départ et d\'arrivée',
-          style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+    return Column(
+      children: [
+        // Point de départ
+        GpsPointSelector(
+          title: 'Point de départ',
+          color: Colors.blue,
+          icon: Icons.flight_takeoff_rounded,
+          initialLatitude: _latitudeDepartController.text.isNotEmpty 
+              ? double.tryParse(_latitudeDepartController.text) 
+              : null,
+          initialLongitude: _longitudeDepartController.text.isNotEmpty 
+              ? double.tryParse(_longitudeDepartController.text) 
+              : null,
+          onPointSelected: (lat, lng, name) {
+            setState(() {
+              _latitudeDepartController.text = lat.toString();
+              _longitudeDepartController.text = lng.toString();
+            });
+          },
         ),
-        const SizedBox(height: 20),
-        Row(
-          children: [
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.blue.withOpacity(0.2)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.flight_takeoff_rounded, color: Colors.blue, size: 20),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Point de départ',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: Colors.blue,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _latitudeDepartController,
-                      decoration: const InputDecoration(
-                        labelText: 'Latitude *',
-                        hintText: 'Ex: 48.8566',
-                        isDense: true,
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) return 'Latitude requise';
-                        final lat = double.tryParse(value);
-                        if (lat == null || lat < -90 || lat > 90) {
-                          return 'Latitude invalide';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _longitudeDepartController,
-                      decoration: const InputDecoration(
-                        labelText: 'Longitude *',
-                        hintText: 'Ex: 2.3522',
-                        isDense: true,
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) return 'Longitude requise';
-                        final lng = double.tryParse(value);
-                        if (lng == null || lng < -180 || lng > 180) {
-                          return 'Longitude invalide';
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
-                ),
+        const SizedBox(height: 24),
+        
+        // Point d'arrivée
+        GpsPointSelector(
+          title: 'Point d\'arrivée',
+          color: Colors.green,
+          icon: Icons.flight_land_rounded,
+          initialLatitude: _latitudeArriveeController.text.isNotEmpty 
+              ? double.tryParse(_latitudeArriveeController.text) 
+              : null,
+          initialLongitude: _longitudeArriveeController.text.isNotEmpty 
+              ? double.tryParse(_longitudeArriveeController.text) 
+              : null,
+          onPointSelected: (lat, lng, name) {
+            setState(() {
+              _latitudeArriveeController.text = lat.toString();
+              _longitudeArriveeController.text = lng.toString();
+            });
+          },
+        ),
+        
+        // Validation cachée pour les coordonnées
+        Offstage(
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _latitudeDepartController,
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Point de départ requis';
+                  final lat = double.tryParse(value);
+                  if (lat == null || lat < -90 || lat > 90) {
+                    return 'Latitude de départ invalide';
+                  }
+                  return null;
+                },
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.green.withOpacity(0.2)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.flight_land_rounded, color: Colors.green, size: 20),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Point d\'arrivée',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: Colors.green,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _latitudeArriveeController,
-                      decoration: const InputDecoration(
-                        labelText: 'Latitude *',
-                        hintText: 'Ex: 48.8566',
-                        isDense: true,
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) return 'Latitude requise';
-                        final lat = double.tryParse(value);
-                        if (lat == null || lat < -90 || lat > 90) {
-                          return 'Latitude invalide';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _longitudeArriveeController,
-                      decoration: const InputDecoration(
-                        labelText: 'Longitude *',
-                        hintText: 'Ex: 2.3522',
-                        isDense: true,
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) return 'Longitude requise';
-                        final lng = double.tryParse(value);
-                        if (lng == null || lng < -180 || lng > 180) {
-                          return 'Longitude invalide';
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
-                ),
+              TextFormField(
+                controller: _longitudeDepartController,
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Point de départ requis';
+                  final lng = double.tryParse(value);
+                  if (lng == null || lng < -180 || lng > 180) {
+                    return 'Longitude de départ invalide';
+                  }
+                  return null;
+                },
               ),
-            ),
-          ],
+              TextFormField(
+                controller: _latitudeArriveeController,
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Point d\'arrivée requis';
+                  final lat = double.tryParse(value);
+                  if (lat == null || lat < -90 || lat > 90) {
+                    return 'Latitude d\'arrivée invalide';
+                  }
+                  return null;
+                },
+              ),
+              TextFormField(
+                controller: _longitudeArriveeController,
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Point d\'arrivée requis';
+                  final lng = double.tryParse(value);
+                  if (lng == null || lng < -180 || lng > 180) {
+                    return 'Longitude d\'arrivée invalide';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
         ),
       ],
     );
