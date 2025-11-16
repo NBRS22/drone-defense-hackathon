@@ -113,8 +113,10 @@ class _AddMissionPageState extends State<AddMissionPage> {
 
         // Réinitialiser le formulaire
         _formKey.currentState!.reset();
-        _selectedTypeMateriel = null;
-        _selectedUrgence = null;
+        setState(() {
+          _selectedTypeMateriel = null;
+          _selectedUrgence = null;
+        });
         _poidsController.clear();
         _latitudeDepartController.clear();
         _longitudeDepartController.clear();
@@ -151,525 +153,108 @@ class _AddMissionPageState extends State<AddMissionPage> {
     }
   }
 
-  Widget _buildSectionHeader(String title, IconData icon, Color color) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade800,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUrgencyBadge(Urgence urgence) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: urgence.color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: urgence.color.withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: urgence.color,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            urgence.label,
-            style: TextStyle(
-              color: urgence.color,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          // Header avec gradient
-          SliverAppBar(
-            expandedHeight: 180,
-            floating: false,
-            pinned: true,
-            elevation: 0,
-            backgroundColor: Colors.transparent,
-            flexibleSpace: FlexibleSpaceBar(
-              title: const Text(
-                'Nouvelle Mission',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              centerTitle: true,
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      const Color(0xFF1E88E5),
-                      const Color(0xFF1565C0),
-                    ],
-                  ),
-                ),
-                child: Stack(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        title: const Text('Nouvelle Mission'),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1E293B),
+      ),
+      body: Form(
+        key: _formKey,
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Positioned(
-                      top: -50,
-                      right: -50,
-                      child: Container(
-                        width: 200,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.1),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: -30,
-                      left: -30,
-                      child: Container(
-                        width: 150,
-                        height: 150,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.1),
-                        ),
-                      ),
-                    ),
+                    _buildWelcomeHeader(),
+                    const SizedBox(height: 32),
+                    _buildMaterialSection(),
+                    const SizedBox(height: 24),
+                    _buildUrgencySection(),
+                    const SizedBox(height: 24),
+                    _buildWeightSection(),
+                    const SizedBox(height: 24),
+                    _buildLocationSection(),
+                    const SizedBox(height: 24),
+                    _buildContactSection(),
+                    const SizedBox(height: 24),
+                    _buildDescriptionSection(),
+                    const SizedBox(height: 100), // Espace pour le bouton flottant
                   ],
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+      floatingActionButton: _buildSubmitButton(),
+    );
+  }
+
+  Widget _buildWelcomeHeader() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Theme.of(context).colorScheme.primary,
+            Theme.of(context).colorScheme.primary.withOpacity(0.8),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+            offset: const Offset(0, 8),
+            blurRadius: 24,
           ),
-          // Contenu du formulaire
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Section Matériel
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildSectionHeader(
-                              'Informations du matériel',
-                              Icons.inventory_2,
-                              const Color(0xFF1E88E5),
-                            ),
-                            const SizedBox(height: 8),
-                            
-                            // Type de matériel
-                            DropdownButtonFormField<TypeMateriel>(
-                              value: _selectedTypeMateriel,
-                              decoration: InputDecoration(
-                                labelText: 'Type de matériel *',
-                                prefixIcon: const Icon(Icons.local_shipping),
-                                suffixIcon: _selectedTypeMateriel != null
-                                    ? Icon(Icons.check_circle, 
-                                        color: Colors.green.shade600, size: 20)
-                                    : null,
-                              ),
-                              items: TypeMateriel.values.map((type) {
-                                return DropdownMenuItem(
-                                  value: type,
-                                  child: Row(
-                                    children: [
-                                      Icon(_getMaterialIcon(type), 
-                                          color: Colors.grey.shade700, size: 20),
-                                      const SizedBox(width: 12),
-                                      Text(type.label),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedTypeMateriel = value;
-                                });
-                              },
-                              validator: (value) {
-                                if (value == null) {
-                                  return 'Veuillez sélectionner un type de matériel';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 20),
-                            
-                            // Urgence
-                            DropdownButtonFormField<Urgence>(
-                              value: _selectedUrgence,
-                              decoration: InputDecoration(
-                                labelText: 'Niveau d\'urgence *',
-                                prefixIcon: const Icon(Icons.priority_high),
-                                suffixIcon: _selectedUrgence != null
-                                    ? _buildUrgencyBadge(_selectedUrgence!)
-                                    : null,
-                              ),
-                              items: Urgence.values.map((urgence) {
-                                return DropdownMenuItem(
-                                  value: urgence,
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 12,
-                                        height: 12,
-                                        decoration: BoxDecoration(
-                                          color: urgence.color,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Text(urgence.label),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedUrgence = value;
-                                });
-                              },
-                              validator: (value) {
-                                if (value == null) {
-                                  return 'Veuillez sélectionner un niveau d\'urgence';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 20),
-                            
-                            // Poids
-                            TextFormField(
-                              controller: _poidsController,
-                              decoration: const InputDecoration(
-                                labelText: 'Poids (kg) *',
-                                prefixIcon: Icon(Icons.scale),
-                                hintText: 'Ex: 2.5',
-                                suffixText: 'kg',
-                              ),
-                              keyboardType: TextInputType.numberWithOptions(decimal: true),
-                              inputFormatters: [
-                                FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                              ],
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Veuillez entrer le poids';
-                                }
-                                final poids = double.tryParse(value);
-                                if (poids == null || poids <= 0) {
-                                  return 'Le poids doit être un nombre positif';
-                                }
-                                return null;
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    // Section Départ
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildSectionHeader(
-                              'Point de départ',
-                              Icons.flight_takeoff,
-                              const Color(0xFF43A047),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextFormField(
-                                    controller: _latitudeDepartController,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Latitude *',
-                                      prefixIcon: Icon(Icons.location_on),
-                                      hintText: 'Ex: 48.8566',
-                                    ),
-                                    keyboardType: TextInputType.numberWithOptions(decimal: true),
-                                    inputFormatters: [
-                                      FilteringTextInputFormatter.allow(
-                                        RegExp(r'^-?\d+\.?\d{0,6}'),
-                                      ),
-                                    ],
-                                    validator: (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return 'Latitude requise';
-                                      }
-                                      final lat = double.tryParse(value);
-                                      if (lat == null || lat < -90 || lat > 90) {
-                                        return 'Latitude invalide (-90 à 90)';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: TextFormField(
-                                    controller: _longitudeDepartController,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Longitude *',
-                                      prefixIcon: Icon(Icons.explore),
-                                      hintText: 'Ex: 2.3522',
-                                    ),
-                                    keyboardType: TextInputType.numberWithOptions(decimal: true),
-                                    inputFormatters: [
-                                      FilteringTextInputFormatter.allow(
-                                        RegExp(r'^-?\d+\.?\d{0,6}'),
-                                      ),
-                                    ],
-                                    validator: (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return 'Longitude requise';
-                                      }
-                                      final lon = double.tryParse(value);
-                                      if (lon == null || lon < -180 || lon > 180) {
-                                        return 'Longitude invalide (-180 à 180)';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    // Section Arrivée
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildSectionHeader(
-                              'Point d\'arrivée',
-                              Icons.flight_land,
-                              Colors.orange,
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextFormField(
-                                    controller: _latitudeArriveeController,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Latitude *',
-                                      prefixIcon: Icon(Icons.location_on),
-                                      hintText: 'Ex: 48.8566',
-                                    ),
-                                    keyboardType: TextInputType.numberWithOptions(decimal: true),
-                                    inputFormatters: [
-                                      FilteringTextInputFormatter.allow(
-                                        RegExp(r'^-?\d+\.?\d{0,6}'),
-                                      ),
-                                    ],
-                                    validator: (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return 'Latitude requise';
-                                      }
-                                      final lat = double.tryParse(value);
-                                      if (lat == null || lat < -90 || lat > 90) {
-                                        return 'Latitude invalide (-90 à 90)';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: TextFormField(
-                                    controller: _longitudeArriveeController,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Longitude *',
-                                      prefixIcon: Icon(Icons.explore),
-                                      hintText: 'Ex: 2.3522',
-                                    ),
-                                    keyboardType: TextInputType.numberWithOptions(decimal: true),
-                                    inputFormatters: [
-                                      FilteringTextInputFormatter.allow(
-                                        RegExp(r'^-?\d+\.?\d{0,6}'),
-                                      ),
-                                    ],
-                                    validator: (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return 'Longitude requise';
-                                      }
-                                      final lon = double.tryParse(value);
-                                      if (lon == null || lon < -180 || lon > 180) {
-                                        return 'Longitude invalide (-180 à 180)';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    // Section Informations complémentaires
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildSectionHeader(
-                              'Informations complémentaires',
-                              Icons.info_outline,
-                              Colors.purple,
-                            ),
-                            const SizedBox(height: 8),
-                            
-                            TextFormField(
-                              controller: _destinataireController,
-                              decoration: const InputDecoration(
-                                labelText: 'Destinataire',
-                                prefixIcon: Icon(Icons.person),
-                                hintText: 'Nom du destinataire',
-                              ),
-                              textCapitalization: TextCapitalization.words,
-                            ),
-                            const SizedBox(height: 16),
-                            
-                            TextFormField(
-                              controller: _telephoneController,
-                              decoration: const InputDecoration(
-                                labelText: 'Téléphone de contact',
-                                prefixIcon: Icon(Icons.phone),
-                                hintText: 'Ex: +33 6 12 34 56 78',
-                              ),
-                              keyboardType: TextInputType.phone,
-                            ),
-                            const SizedBox(height: 16),
-                            
-                            TextFormField(
-                              controller: _descriptionController,
-                              decoration: const InputDecoration(
-                                labelText: 'Description',
-                                prefixIcon: Icon(Icons.description),
-                                hintText: 'Informations supplémentaires...',
-                                alignLabelWithHint: true,
-                              ),
-                              maxLines: 3,
-                              textCapitalization: TextCapitalization.sentences,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    
-                    // Bouton de soumission
-                    Container(
-                      height: 56,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFF1E88E5),
-                            const Color(0xFF1565C0),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF1E88E5).withOpacity(0.3),
-                            blurRadius: 12,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _submitForm,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              )
-                            : const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.send, color: Colors.white),
-                                  SizedBox(width: 12),
-                                  Text(
-                                    'Créer la mission',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Icon(
+              Icons.add_task_rounded,
+              color: Colors.white,
+              size: 32,
+            ),
+          ),
+          const SizedBox(width: 16),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Mission d\'urgence',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
+                SizedBox(height: 4),
+                Text(
+                  'Créez une nouvelle mission de livraison critique par drone',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -677,18 +262,512 @@ class _AddMissionPageState extends State<AddMissionPage> {
     );
   }
 
-  IconData _getMaterialIcon(TypeMateriel type) {
+  Widget _buildMaterialSection() {
+    return _buildSection(
+      'Type de matériel',
+      Icons.inventory_2_rounded,
+      Theme.of(context).colorScheme.primary,
+      [
+        const Text(
+          'Sélectionnez le type de matériel à livrer',
+          style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: TypeMateriel.values.map((type) {
+            final isSelected = _selectedTypeMateriel == type;
+            return GestureDetector(
+              onTap: () => setState(() => _selectedTypeMateriel = type),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isSelected 
+                      ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                      : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isSelected 
+                        ? Theme.of(context).colorScheme.primary 
+                        : Colors.grey.shade300,
+                    width: isSelected ? 2 : 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _getTypeIcon(type),
+                      color: isSelected 
+                          ? Theme.of(context).colorScheme.primary
+                          : Colors.grey.shade600,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      type.label,
+                      style: TextStyle(
+                        color: isSelected 
+                            ? Theme.of(context).colorScheme.primary
+                            : Colors.grey.shade700,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUrgencySection() {
+    return _buildSection(
+      'Niveau d\'urgence',
+      Icons.priority_high_rounded,
+      const Color(0xFFDC2626),
+      [
+        const Text(
+          'Définissez la priorité de cette mission',
+          style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+        ),
+        const SizedBox(height: 16),
+        Column(
+          children: Urgence.values.map((urgence) {
+            final isSelected = _selectedUrgence == urgence;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: isSelected 
+                    ? urgence.color.withOpacity(0.1)
+                    : Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isSelected ? urgence.color : Colors.grey.shade300,
+                  width: isSelected ? 2 : 1,
+                ),
+              ),
+              child: RadioListTile<Urgence>(
+                value: urgence,
+                groupValue: _selectedUrgence,
+                onChanged: (value) => setState(() => _selectedUrgence = value),
+                title: Row(
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: urgence.color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      urgence.label,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: isSelected ? urgence.color : const Color(0xFF1E293B),
+                      ),
+                    ),
+                  ],
+                ),
+                subtitle: Text(
+                  _getUrgenceDescription(urgence),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isSelected ? urgence.color.withOpacity(0.8) : const Color(0xFF64748B),
+                  ),
+                ),
+                activeColor: urgence.color,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWeightSection() {
+    return _buildSection(
+      'Poids du matériel',
+      Icons.scale_rounded,
+      const Color(0xFF059669),
+      [
+        const Text(
+          'Spécifiez le poids pour l\'attribution du drone',
+          style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _poidsController,
+          decoration: const InputDecoration(
+            labelText: 'Poids en kilogrammes *',
+            prefixIcon: Icon(Icons.scale_rounded),
+            suffixText: 'kg',
+            hintText: 'Ex: 2.5',
+          ),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+          ],
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Poids requis';
+            }
+            final weight = double.tryParse(value);
+            if (weight == null || weight <= 0) {
+              return 'Poids invalide';
+            }
+            if (weight > 50) {
+              return 'Poids maximum: 50 kg';
+            }
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLocationSection() {
+    return _buildSection(
+      'Coordonnées GPS',
+      Icons.map_rounded,
+      const Color(0xFF7C3AED),
+      [
+        const Text(
+          'Définissez les points de départ et d\'arrivée',
+          style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+        ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.flight_takeoff_rounded, color: Colors.blue, size: 20),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Point de départ',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.blue,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _latitudeDepartController,
+                      decoration: const InputDecoration(
+                        labelText: 'Latitude *',
+                        hintText: 'Ex: 48.8566',
+                        isDense: true,
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) return 'Latitude requise';
+                        final lat = double.tryParse(value);
+                        if (lat == null || lat < -90 || lat > 90) {
+                          return 'Latitude invalide';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _longitudeDepartController,
+                      decoration: const InputDecoration(
+                        labelText: 'Longitude *',
+                        hintText: 'Ex: 2.3522',
+                        isDense: true,
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) return 'Longitude requise';
+                        final lng = double.tryParse(value);
+                        if (lng == null || lng < -180 || lng > 180) {
+                          return 'Longitude invalide';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.green.withOpacity(0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.flight_land_rounded, color: Colors.green, size: 20),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Point d\'arrivée',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _latitudeArriveeController,
+                      decoration: const InputDecoration(
+                        labelText: 'Latitude *',
+                        hintText: 'Ex: 48.8566',
+                        isDense: true,
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) return 'Latitude requise';
+                        final lat = double.tryParse(value);
+                        if (lat == null || lat < -90 || lat > 90) {
+                          return 'Latitude invalide';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _longitudeArriveeController,
+                      decoration: const InputDecoration(
+                        labelText: 'Longitude *',
+                        hintText: 'Ex: 2.3522',
+                        isDense: true,
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) return 'Longitude requise';
+                        final lng = double.tryParse(value);
+                        if (lng == null || lng < -180 || lng > 180) {
+                          return 'Longitude invalide';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContactSection() {
+    return _buildSection(
+      'Informations de contact',
+      Icons.contact_phone_rounded,
+      const Color(0xFFF59E0B),
+      [
+        const Text(
+          'Coordonnées du destinataire (optionnel)',
+          style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _destinataireController,
+          decoration: const InputDecoration(
+            labelText: 'Nom du destinataire',
+            prefixIcon: Icon(Icons.person_rounded),
+            hintText: 'Dr. Martin Dubois',
+          ),
+          textCapitalization: TextCapitalization.words,
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _telephoneController,
+          decoration: const InputDecoration(
+            labelText: 'Téléphone de contact',
+            prefixIcon: Icon(Icons.phone_rounded),
+            hintText: '+33 6 12 34 56 78',
+          ),
+          keyboardType: TextInputType.phone,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDescriptionSection() {
+    return _buildSection(
+      'Description de la mission',
+      Icons.description_rounded,
+      const Color(0xFF8B5CF6),
+      [
+        const Text(
+          'Ajoutez des détails supplémentaires (optionnel)',
+          style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _descriptionController,
+          decoration: const InputDecoration(
+            labelText: 'Informations supplémentaires',
+            hintText: 'Patient en arrêt cardiaque, livraison urgente...',
+            alignLabelWithHint: true,
+          ),
+          maxLines: 4,
+          textCapitalization: TextCapitalization.sentences,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSection(String title, IconData icon, Color color, List<Widget> children) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            offset: const Offset(0, 4),
+            blurRadius: 12,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubmitButton() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      child: FloatingActionButton.extended(
+        onPressed: _isLoading ? null : _submitForm,
+        backgroundColor: _isLoading 
+            ? Colors.grey.shade400 
+            : Theme.of(context).colorScheme.primary,
+        elevation: 8,
+        extendedPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+        label: _isLoading
+            ? const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Text('Création en cours...'),
+                ],
+              )
+            : const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.send_rounded),
+                  SizedBox(width: 8),
+                  Text(
+                    'Créer la mission',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
+  IconData _getTypeIcon(TypeMateriel type) {
     switch (type) {
       case TypeMateriel.pocheSang:
-        return Icons.bloodtype;
+        return Icons.bloodtype_rounded;
       case TypeMateriel.defibrillateur:
-        return Icons.medical_services;
+        return Icons.monitor_heart_rounded;
       case TypeMateriel.medicament:
-        return Icons.medication;
+        return Icons.medication_rounded;
       case TypeMateriel.pieceMecanique:
-        return Icons.build;
+        return Icons.build_rounded;
       case TypeMateriel.autre:
-        return Icons.category;
+        return Icons.inventory_2_rounded;
+    }
+  }
+
+  String _getUrgenceDescription(Urgence urgence) {
+    switch (urgence) {
+      case Urgence.critique:
+        return 'Urgence vitale - Livraison immédiate';
+      case Urgence.elevee:
+        return 'Priorité élevée - Livraison rapide';
+      case Urgence.normale:
+        return 'Livraison standard';
     }
   }
 }
