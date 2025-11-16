@@ -163,7 +163,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildStatsGrid() {
-    final critiques = _missions.where((m) => m.urgence == Urgence.critique).length;
+    final critiques = _missions.where((m) => m.risque >= 4).length;
     final enAttente = _missions.where((m) => m.statut == 'en_attente').length;
     final total = _missions.length;
 
@@ -318,12 +318,12 @@ class _DashboardPageState extends State<DashboardPage> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: mission.urgence.color.withOpacity(0.1),
+              color: _getRisqueColor(mission.risque).withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
-              _getTypeIcon(mission.typeMateriel),
-              color: mission.urgence.color,
+              _getTypeIcon(mission.typeCargaison ?? 'autre'),
+              color: _getRisqueColor(mission.risque),
               size: 24,
             ),
           ),
@@ -333,7 +333,7 @@ class _DashboardPageState extends State<DashboardPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  mission.typeMateriel.label,
+                  _getTypeCargaisonLabel(mission.typeCargaison ?? 'autre'),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -346,21 +346,21 @@ class _DashboardPageState extends State<DashboardPage> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: mission.urgence.color.withOpacity(0.1),
+                        color: _getRisqueColor(mission.risque).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        mission.urgence.label,
+                        'Risque ${mission.risque}',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
-                          color: mission.urgence.color,
+                          color: _getRisqueColor(mission.risque),
                         ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '${mission.poidsKg} kg',
+                      '${mission.poids} kg',
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF64748B),
@@ -426,18 +426,60 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  IconData _getTypeIcon(TypeMateriel type) {
+  IconData _getTypeIcon(String type) {
     switch (type) {
-      case TypeMateriel.pocheSang:
+      case 'poche_sang':
         return Icons.bloodtype_rounded;
-      case TypeMateriel.defibrillateur:
+      case 'defibrillateur':
         return Icons.monitor_heart_rounded;
-      case TypeMateriel.medicament:
+      case 'medicament':
         return Icons.medication_rounded;
-      case TypeMateriel.pieceMecanique:
+      case 'piece_mecanique':
         return Icons.build_rounded;
-      case TypeMateriel.autre:
+      case 'fragile':
+        return Icons.warning_rounded;
+      case 'perissable':
+        return Icons.schedule_rounded;
+      case 'autre':
+      default:
         return Icons.inventory_2_rounded;
+    }
+  }
+
+  String _getTypeCargaisonLabel(String type) {
+    switch (type) {
+      case 'poche_sang':
+        return 'Poche de sang';
+      case 'defibrillateur':
+        return 'Défibrillateur';
+      case 'medicament':
+        return 'Médicament';
+      case 'piece_mecanique':
+        return 'Pièce mécanique';
+      case 'fragile':
+        return 'Fragile';
+      case 'perissable':
+        return 'Périssable';
+      case 'autre':
+      default:
+        return 'Autre';
+    }
+  }
+
+  Color _getRisqueColor(int risque) {
+    switch (risque) {
+      case 1:
+        return Colors.green.shade600;
+      case 2:
+        return Colors.lightGreen.shade600;
+      case 3:
+        return Colors.orange.shade600;
+      case 4:
+        return Colors.deepOrange.shade600;
+      case 5:
+        return Colors.red.shade600;
+      default:
+        return Colors.grey.shade600;
     }
   }
 }

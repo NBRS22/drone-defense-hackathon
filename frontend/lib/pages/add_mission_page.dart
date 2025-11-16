@@ -17,9 +17,9 @@ class _AddMissionPageState extends State<AddMissionPage> {
   bool _isLoading = false;
 
   // Contrôleurs pour les champs du formulaire
-  TypeMateriel? _selectedTypeMateriel;
-  Urgence? _selectedUrgence;
+  TypeCargaison? _selectedTypeCargaison;
   final TextEditingController _poidsController = TextEditingController();
+  final TextEditingController _risqueController = TextEditingController();
   final TextEditingController _latitudeDepartController = TextEditingController();
   final TextEditingController _longitudeDepartController = TextEditingController();
   final TextEditingController _latitudeArriveeController = TextEditingController();
@@ -31,6 +31,7 @@ class _AddMissionPageState extends State<AddMissionPage> {
   @override
   void dispose() {
     _poidsController.dispose();
+    _risqueController.dispose();
     _latitudeDepartController.dispose();
     _longitudeDepartController.dispose();
     _latitudeArriveeController.dispose();
@@ -46,14 +47,14 @@ class _AddMissionPageState extends State<AddMissionPage> {
       return;
     }
 
-    if (_selectedTypeMateriel == null || _selectedUrgence == null) {
+    if (_selectedTypeCargaison == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Row(
             children: [
               Icon(Icons.error_outline, color: Colors.white),
               SizedBox(width: 12),
-              Expanded(child: Text('Veuillez remplir tous les champs obligatoires')),
+              Expanded(child: Text('Veuillez sélectionner un type de cargaison')),
             ],
           ),
           backgroundColor: Colors.red.shade600,
@@ -70,9 +71,10 @@ class _AddMissionPageState extends State<AddMissionPage> {
 
     try {
       final mission = Mission(
-        typeMateriel: _selectedTypeMateriel!,
-        urgence: _selectedUrgence!,
-        poidsKg: double.parse(_poidsController.text),
+        poids: double.parse(_poidsController.text),
+        risque: int.parse(_risqueController.text),
+        typeCargaison: _selectedTypeCargaison!.value,
+        statut: 'en_attente',
         latitudeDepart: double.parse(_latitudeDepartController.text),
         longitudeDepart: double.parse(_longitudeDepartController.text),
         latitudeArrivee: double.parse(_latitudeArriveeController.text),
@@ -99,7 +101,7 @@ class _AddMissionPageState extends State<AddMissionPage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Mission créée avec succès (ID: ${createdMission.id})',
+                    'Mission créée avec succès (ID: ${createdMission.missionId})',
                     style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
                 ),
@@ -115,10 +117,10 @@ class _AddMissionPageState extends State<AddMissionPage> {
         // Réinitialiser le formulaire
         _formKey.currentState!.reset();
         setState(() {
-          _selectedTypeMateriel = null;
-          _selectedUrgence = null;
+          _selectedTypeCargaison = null;
         });
         _poidsController.clear();
+        _risqueController.clear();
         _latitudeDepartController.clear();
         _longitudeDepartController.clear();
         _latitudeArriveeController.clear();
@@ -178,7 +180,7 @@ class _AddMissionPageState extends State<AddMissionPage> {
                     const SizedBox(height: 32),
                     _buildMaterialSection(),
                     const SizedBox(height: 24),
-                    _buildUrgencySection(),
+                    _buildRisqueSection(),
                     const SizedBox(height: 24),
                     _buildWeightSection(),
                     const SizedBox(height: 24),
@@ -277,10 +279,10 @@ class _AddMissionPageState extends State<AddMissionPage> {
         Wrap(
           spacing: 12,
           runSpacing: 12,
-          children: TypeMateriel.values.map((type) {
-            final isSelected = _selectedTypeMateriel == type;
-            return GestureDetector(
-              onTap: () => setState(() => _selectedTypeMateriel = type),
+        children: TypeCargaison.values.map((type) {
+          final isSelected = _selectedTypeCargaison == type;
+          return GestureDetector(
+            onTap: () => setState(() => _selectedTypeCargaison = type),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
@@ -325,70 +327,63 @@ class _AddMissionPageState extends State<AddMissionPage> {
     );
   }
 
-  Widget _buildUrgencySection() {
+  Widget _buildRisqueSection() {
     return _buildSection(
-      'Niveau d\'urgence',
-      Icons.priority_high_rounded,
+      'Niveau de risque',
+      Icons.warning_amber_rounded,
       const Color(0xFFDC2626),
       [
         const Text(
-          'Définissez la priorité de cette mission',
+          'Définissez le niveau de risque de cette mission (1-5)',
           style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
         ),
         const SizedBox(height: 16),
-        Column(
-          children: Urgence.values.map((urgence) {
-            final isSelected = _selectedUrgence == urgence;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(
-                color: isSelected 
-                    ? urgence.color.withOpacity(0.1)
-                    : Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isSelected ? urgence.color : Colors.grey.shade300,
-                  width: isSelected ? 2 : 1,
+        TextFormField(
+          controller: _risqueController,
+          decoration: const InputDecoration(
+            labelText: 'Niveau de risque',
+            hintText: 'Entrez un niveau de 1 à 5',
+            prefixIcon: Icon(Icons.trending_up),
+          ),
+          keyboardType: TextInputType.number,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Veuillez entrer un niveau de risque';
+            }
+            final risque = int.tryParse(value);
+            if (risque == null || risque < 1 || risque > 5) {
+              return 'Le niveau de risque doit être entre 1 et 5';
+            }
+            return null;
+          },
+        ),
+        if (_risqueController.text.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 20,
                 ),
-              ),
-              child: RadioListTile<Urgence>(
-                value: urgence,
-                groupValue: _selectedUrgence,
-                onChanged: (value) => setState(() => _selectedUrgence = value),
-                title: Row(
-                  children: [
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: urgence.color,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      urgence.label,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: isSelected ? urgence.color : const Color(0xFF1E293B),
-                      ),
-                    ),
-                  ],
-                ),
-                subtitle: Text(
-                  _getUrgenceDescription(urgence),
+                const SizedBox(width: 8),
+                Text(
+                  _getRisqueDescription(int.tryParse(_risqueController.text) ?? 0),
                   style: TextStyle(
-                    fontSize: 12,
-                    color: isSelected ? urgence.color.withOpacity(0.8) : const Color(0xFF64748B),
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                activeColor: urgence.color,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              ),
-            );
-          }).toList(),
-        ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -681,29 +676,39 @@ class _AddMissionPageState extends State<AddMissionPage> {
     );
   }
 
-  IconData _getTypeIcon(TypeMateriel type) {
+  IconData _getTypeIcon(TypeCargaison type) {
     switch (type) {
-      case TypeMateriel.pocheSang:
+      case TypeCargaison.pocheSang:
         return Icons.bloodtype_rounded;
-      case TypeMateriel.defibrillateur:
+      case TypeCargaison.defibrillateur:
         return Icons.monitor_heart_rounded;
-      case TypeMateriel.medicament:
+      case TypeCargaison.medicament:
         return Icons.medication_rounded;
-      case TypeMateriel.pieceMecanique:
+      case TypeCargaison.pieceMecanique:
         return Icons.build_rounded;
-      case TypeMateriel.autre:
+      case TypeCargaison.fragile:
+        return Icons.warning_rounded;
+      case TypeCargaison.perissable:
+        return Icons.access_time_rounded;
+      case TypeCargaison.autre:
         return Icons.inventory_2_rounded;
     }
   }
 
-  String _getUrgenceDescription(Urgence urgence) {
-    switch (urgence) {
-      case Urgence.critique:
-        return 'Urgence vitale - Livraison immédiate';
-      case Urgence.elevee:
-        return 'Priorité élevée - Livraison rapide';
-      case Urgence.normale:
-        return 'Livraison standard';
+  String _getRisqueDescription(int risque) {
+    switch (risque) {
+      case 1:
+        return 'Très faible';
+      case 2:
+        return 'Faible';
+      case 3:
+        return 'Moyen';
+      case 4:
+        return 'Élevé';
+      case 5:
+        return 'Critique';
+      default:
+        return 'Non défini';
     }
   }
 }

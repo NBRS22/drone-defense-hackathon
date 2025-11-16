@@ -15,7 +15,7 @@ class _MissionsListPageState extends State<MissionsListPage> {
   List<Mission> _filteredMissions = [];
   bool _isLoading = true;
   String _searchQuery = '';
-  Urgence? _selectedUrgence;
+  int? _selectedRisque;
 
   @override
   void initState() {
@@ -49,13 +49,13 @@ class _MissionsListPageState extends State<MissionsListPage> {
     setState(() {
       _filteredMissions = _missions.where((mission) {
         final matchesSearch = _searchQuery.isEmpty ||
-            mission.typeMateriel.label.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+            (mission.typeCargaison?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false) ||
             (mission.destinataire?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
         
-        final matchesUrgence = _selectedUrgence == null ||
-            mission.urgence == _selectedUrgence;
+        final matchesRisque = _selectedRisque == null ||
+            mission.risque == _selectedRisque;
 
-        return matchesSearch && matchesUrgence;
+        return matchesSearch && matchesRisque;
       }).toList();
     });
   }
@@ -113,16 +113,16 @@ class _MissionsListPageState extends State<MissionsListPage> {
             ),
           ),
           const SizedBox(height: 16),
-          // Filtres par urgence
+          // Filtres par niveau de risque
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _buildUrgenceFilter(null, 'Toutes'),
+                _buildRisqueFilter(null, 'Tous'),
                 const SizedBox(width: 8),
-                ...Urgence.values.map((urgence) => Padding(
+                ...[1, 2, 3, 4, 5].map((risque) => Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: _buildUrgenceFilter(urgence, urgence.label),
+                  child: _buildRisqueFilter(risque, 'Risque $risque'),
                 )),
               ],
             ),
@@ -132,16 +132,37 @@ class _MissionsListPageState extends State<MissionsListPage> {
     );
   }
 
-  Widget _buildUrgenceFilter(Urgence? urgence, String label) {
-    final isSelected = _selectedUrgence == urgence;
-    final color = urgence?.color ?? Theme.of(context).colorScheme.primary;
+  Widget _buildRisqueFilter(int? risque, String label) {
+    final isSelected = _selectedRisque == risque;
+    Color color = Theme.of(context).colorScheme.primary;
+    
+    // Define colors based on risk level
+    if (risque != null) {
+      switch (risque) {
+        case 1:
+          color = Colors.green.shade600;
+          break;
+        case 2:
+          color = Colors.lightGreen.shade600;
+          break;
+        case 3:
+          color = Colors.orange.shade600;
+          break;
+        case 4:
+          color = Colors.deepOrange.shade600;
+          break;
+        case 5:
+          color = Colors.red.shade600;
+          break;
+      }
+    }
 
     return FilterChip(
       label: Text(label),
       selected: isSelected,
       onSelected: (selected) {
         setState(() {
-          _selectedUrgence = selected ? urgence : null;
+          _selectedRisque = selected ? risque : null;
         });
         _filterMissions();
       },
@@ -197,7 +218,7 @@ class _MissionsListPageState extends State<MissionsListPage> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: mission.urgence.color.withOpacity(0.05),
+              color: _getRisqueColor(mission.risque).withOpacity(0.05),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(20),
                 topRight: Radius.circular(20),
@@ -208,12 +229,12 @@ class _MissionsListPageState extends State<MissionsListPage> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: mission.urgence.color.withOpacity(0.1),
+                    color: _getRisqueColor(mission.risque).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
-                    _getTypeIcon(mission.typeMateriel),
-                    color: mission.urgence.color,
+                    _getTypeIcon(mission.typeCargaison ?? 'autre'),
+                    color: _getRisqueColor(mission.risque),
                     size: 28,
                   ),
                 ),
@@ -225,7 +246,7 @@ class _MissionsListPageState extends State<MissionsListPage> {
                       Row(
                         children: [
                           Text(
-                            'Mission #${mission.id}',
+                            mission.description ?? 'Mission #${mission.missionId}',
                             style: const TextStyle(
                               fontSize: 14,
                               color: Color(0xFF64748B),
@@ -236,9 +257,9 @@ class _MissionsListPageState extends State<MissionsListPage> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: mission.urgence.color.withOpacity(0.1),
+                              color: _getRisqueColor(mission.risque).withOpacity(0.1),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: mission.urgence.color.withOpacity(0.3)),
+                              border: Border.all(color: _getRisqueColor(mission.risque).withOpacity(0.3)),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -247,17 +268,17 @@ class _MissionsListPageState extends State<MissionsListPage> {
                                   width: 6,
                                   height: 6,
                                   decoration: BoxDecoration(
-                                    color: mission.urgence.color,
+                                    color: _getRisqueColor(mission.risque),
                                     shape: BoxShape.circle,
                                   ),
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
-                                  mission.urgence.label,
+                                  'Risque ${mission.risque}',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
-                                    color: mission.urgence.color,
+                                    color: _getRisqueColor(mission.risque),
                                   ),
                                 ),
                               ],
@@ -267,7 +288,7 @@ class _MissionsListPageState extends State<MissionsListPage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        mission.typeMateriel.label,
+                        _getTypeCargaisonLabel(mission.typeCargaison ?? 'autre'),
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -291,7 +312,7 @@ class _MissionsListPageState extends State<MissionsListPage> {
                       child: _buildInfoItem(
                         Icons.scale_rounded,
                         'Poids',
-                        '${mission.poidsKg} kg',
+                        '${mission.poids} kg',
                       ),
                     ),
                     Container(
@@ -489,18 +510,60 @@ class _MissionsListPageState extends State<MissionsListPage> {
     );
   }
 
-  IconData _getTypeIcon(TypeMateriel type) {
+  IconData _getTypeIcon(String type) {
     switch (type) {
-      case TypeMateriel.pocheSang:
+      case 'poche_sang':
         return Icons.bloodtype_rounded;
-      case TypeMateriel.defibrillateur:
+      case 'defibrillateur':
         return Icons.monitor_heart_rounded;
-      case TypeMateriel.medicament:
+      case 'medicament':
         return Icons.medication_rounded;
-      case TypeMateriel.pieceMecanique:
+      case 'piece_mecanique':
         return Icons.build_rounded;
-      case TypeMateriel.autre:
+      case 'fragile':
+        return Icons.warning_rounded;
+      case 'perissable':
+        return Icons.schedule_rounded;
+      case 'autre':
+      default:
         return Icons.inventory_2_rounded;
+    }
+  }
+
+  String _getTypeCargaisonLabel(String type) {
+    switch (type) {
+      case 'poche_sang':
+        return 'Poche de sang';
+      case 'defibrillateur':
+        return 'Défibrillateur';
+      case 'medicament':
+        return 'Médicament';
+      case 'piece_mecanique':
+        return 'Pièce mécanique';
+      case 'fragile':
+        return 'Fragile';
+      case 'perissable':
+        return 'Périssable';
+      case 'autre':
+      default:
+        return 'Autre';
+    }
+  }
+
+  Color _getRisqueColor(int risque) {
+    switch (risque) {
+      case 1:
+        return Colors.green.shade600;
+      case 2:
+        return Colors.lightGreen.shade600;
+      case 3:
+        return Colors.orange.shade600;
+      case 4:
+        return Colors.deepOrange.shade600;
+      case 5:
+        return Colors.red.shade600;
+      default:
+        return Colors.grey.shade600;
     }
   }
 }

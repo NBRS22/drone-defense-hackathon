@@ -1,10 +1,13 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app.models.mission import Base
+from sqlalchemy.ext.declarative import declarative_base
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Create the base class for all models
+Base = declarative_base()
 
 # URL de la base de données (SQLite pour le développement)
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./drone_delivery.db")
@@ -19,6 +22,10 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
     """Initialise la base de données"""
+    # Import all models to make sure they are registered with Base
+    from app.models import Mission, Drone, ZoneDeVol, HistoriqueMission
+    
+    # Create all tables
     Base.metadata.create_all(bind=engine)
 
 
