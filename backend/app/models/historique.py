@@ -2,25 +2,6 @@ from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKe
 from sqlalchemy.orm import relationship
 from app.database import Base
 from datetime import datetime
-import enum
-
-
-class TypeCargaison(str, enum.Enum):
-    POCHE_SANG = "poche_sang"
-    DEFIBRILLATEUR = "defibrillateur"
-    MEDICAMENT = "medicament"
-    PIECE_MECANIQUE = "piece_mecanique"
-    FRAGILE = "fragile"
-    PERISSABLE = "perissable"
-    AUTRE = "autre"
-
-
-class StatutMission(str, enum.Enum):
-    EN_ATTENTE = "en_attente"
-    EN_COURS = "en_cours"
-    TERMINEE = "terminee"
-    ANNULEE = "annulee"
-    ECHEC = "echec"
 
 
 class HistoriqueMission(Base):

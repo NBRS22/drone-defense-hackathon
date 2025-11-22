@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
-from app.schemas.mission import MissionCreate, MissionResponse, MissionUpdate, calculate_distance
+from app.schemas.mission import MissionCreate, MissionResponse, MissionUpdate
 from app.models.mission import Mission
 from datetime import datetime
 
@@ -12,26 +12,19 @@ router = APIRouter(prefix="/api/missions", tags=["missions"])
 @router.post("/", response_model=MissionResponse, status_code=status.HTTP_201_CREATED)
 def create_mission(mission: MissionCreate, db: Session = Depends(get_db)):
     """
-    Créer une nouvelle mission de livraison
+    Créer une nouvelle mission
     """
     mission_data = mission.dict()
     
-    # Calculer automatiquement la distance
-    distance = calculate_distance(
-        mission_data['latitude_depart'],
-        mission_data['longitude_depart'],
-        mission_data['latitude_arrivee'],
-        mission_data['longitude_arrivee']
-    )
-    mission_data['distance'] = distance
+    # Ajouter des valeurs par défaut
+    mission_data['drone_id'] = 'AUTO'  # Assignation automatique à implémenter
+    if not mission_data.get('estimated_duration'):
+        mission_data['estimated_duration'] = 30  # Durée par défaut
     
     db_mission = Mission(**mission_data)
     db.add(db_mission)
     db.commit()
     db.refresh(db_mission)
-    
-    # TODO: Implémenter l'attribution automatique du drone
-    # Pour le moment, on laisse la mission en attente
     
     return db_mission
 
@@ -45,12 +38,21 @@ def get_missions(skip: int = 0, limit: int = 100, db: Session = Depends(get_db))
     return missions
 
 
-@router.get("/statut/{statut}", response_model=List[MissionResponse])
-def get_missions_by_status(statut: str, db: Session = Depends(get_db)):
+@router.get("/status/{status}", response_model=List[MissionResponse])
+def get_missions_by_status(status: str, db: Session = Depends(get_db)):
     """
     Récupérer les missions par statut
     """
-    missions = db.query(Mission).filter(Mission.statut == statut).all()
+    missions = db.query(Mission).filter(Mission.status == status).all()
+    return missions
+
+
+@router.get("/category/{category}", response_model=List[MissionResponse])
+def get_missions_by_category(category: str, db: Session = Depends(get_db)):
+    """
+    Récupérer les missions par catégorie
+    """
+    missions = db.query(Mission).filter(Mission.category == category).all()
     return missions
 
 
@@ -82,6 +84,7 @@ def update_mission(
     for field, value in update_data.items():
         setattr(db_mission, field, value)
     
+    db_mission.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(db_mission)
     return db_mission

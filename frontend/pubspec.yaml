@@ -1,7 +1,7 @@
 name: drone_delivery
-description: Application de livraison par drone en situation de crise
+description: Application de gestion des opérations de drone en situation de crise
 publish_to: 'none'
-version: 1.0.0+1
+version: 2.0.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -19,11 +19,18 @@ dependencies:
   # State Management
   provider: ^6.1.1
   
-  # Maps & Location
-  google_maps_flutter: ^2.5.0
+  # Charts & Data Visualization
+  fl_chart: ^0.65.0
   
   # Utils
   shared_preferences: ^2.2.2
+  
+  # Audio for voice commands
+  speech_to_text: ^6.6.0
+  permission_handler: ^11.2.0
+  
+  # Fonts
+  google_fonts: ^6.1.0
 
 dev_dependencies:
   flutter_test:

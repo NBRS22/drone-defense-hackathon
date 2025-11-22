@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/mission.dart';
 import '../services/api_service.dart';
-import '../widgets/gps_point_selector.dart';
 
 class AddMissionPage extends StatefulWidget {
   const AddMissionPage({super.key});
@@ -11,197 +11,437 @@ class AddMissionPage extends StatefulWidget {
   State<AddMissionPage> createState() => _AddMissionPageState();
 }
 
-class _AddMissionPageState extends State<AddMissionPage> {
+class _AddMissionPageState extends State<AddMissionPage> with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final ApiService _apiService = ApiService();
+  
+  // Controllers
+  final TextEditingController _weightController = TextEditingController();
+  final TextEditingController _departureController = TextEditingController();
+  final TextEditingController _arrivalController = TextEditingController();
+  final TextEditingController _locationController = TextEditingController();
+  final TextEditingController _durationController = TextEditingController();
+  
+  // Form state
+  MissionCategory _selectedCategory = MissionCategory.pochesSang;
+  Priority _selectedPriority = Priority.medium;
+  Risk _selectedRisk = Risk.low;
+  DateTime? _startDate = DateTime.now(); // Planification immédiate par défaut
   bool _isLoading = false;
+  
+  // Planification
+  bool _isImmediateDeparture = true; // Départ immédiat par défaut
+  DateTime? _scheduledDate;
+  TimeOfDay? _scheduledTime;
+  
+  // Navigation par étapes
+  int _currentStep = 0;
+  final PageController _pageController = PageController();
+  
+  final List<String> _stepTitles = [
+    'Type de Mission',
+    'Priorité & Planification', 
+    'Localisation'
+  ];
+  
+  // Lieux prédéfinis
+  String? _selectedDeparture;
+  String? _selectedArrival;
+  
+  // Position actuelle pour GPS
+  String? _currentPosition;
+  
+  // Lieux prédéfinis (avec coordonnées actuelles si disponibles)
+  List<String> get _lieux {
+    List<String> baseLieux = [
+      'Hôpital Central',
+      'Clinique Nord',
+      'Centre Médical Sud',
+      'Pharmacie de la Paix',
+      'Urgences CHU',
+      'Centre de Soins',
+      'Hôpital Régional',
+      'Clinique Saint-Joseph',
+      'Centre de Traumatologie',
+      'Banque du Sang',
+      'Laboratoire Médical',
+      'Centre de Cardiologie',
+    ];
+    
+    if (_currentPosition != null) {
+      return [_currentPosition!, ...baseLieux];
+    }
+    return baseLieux;
+  }
+  
+  // Animations
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+  
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOut,
+    ));
+    
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.2),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutCubic,
+    ));
 
-  // Contrôleurs pour les champs du formulaire
-  TypeCargaison? _selectedTypeCargaison;
-  final TextEditingController _poidsController = TextEditingController();
-  final TextEditingController _risqueController = TextEditingController();
-  final TextEditingController _latitudeDepartController = TextEditingController();
-  final TextEditingController _longitudeDepartController = TextEditingController();
-  final TextEditingController _latitudeArriveeController = TextEditingController();
-  final TextEditingController _longitudeArriveeController = TextEditingController();
-  final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _destinataireController = TextEditingController();
-  final TextEditingController _telephoneController = TextEditingController();
+    _animationController.forward();
+  }
+
+  // Simuler l'obtention de la position GPS actuelle
+  Future<void> _getCurrentLocation() async {
+    try {
+      // Simulation d'une requête GPS
+      await Future.delayed(const Duration(seconds: 1));
+      
+      // Coordonnées fictives pour la démonstration
+      // En réalité, on utiliserait geolocator package
+      double lat = 48.8566 + (DateTime.now().millisecondsSinceEpoch % 1000) / 100000;
+      double lng = 2.3522 + (DateTime.now().millisecondsSinceEpoch % 1000) / 100000;
+      
+      setState(() {
+        _currentPosition = 'Coordonnées actuelles: ${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)}';
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur lors de la récupération de la position'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   void dispose() {
-    _poidsController.dispose();
-    _risqueController.dispose();
-    _latitudeDepartController.dispose();
-    _longitudeDepartController.dispose();
-    _latitudeArriveeController.dispose();
-    _longitudeArriveeController.dispose();
-    _descriptionController.dispose();
-    _destinataireController.dispose();
-    _telephoneController.dispose();
+    _animationController.dispose();
+    _weightController.dispose();
+    _departureController.dispose();
+    _arrivalController.dispose();
+    _locationController.dispose();
+    _durationController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
-  Future<void> _submitForm() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    if (_selectedTypeCargaison == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.error_outline, color: Colors.white),
-              SizedBox(width: 12),
-              Expanded(child: Text('Veuillez sélectionner un type de cargaison')),
-            ],
-          ),
-          backgroundColor: Colors.red.shade600,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
+  void _nextStep() {
+    if (_currentStep < _stepTitles.length - 1) {
+      setState(() {
+        _currentStep++;
+      });
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
       );
-      return;
+      HapticFeedback.lightImpact();
     }
+  }
 
-    setState(() {
-      _isLoading = true;
-    });
+  void _previousStep() {
+    if (_currentStep > 0) {
+      setState(() {
+        _currentStep--;
+      });
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+      HapticFeedback.lightImpact();
+    }
+  }
+
+  bool _canProceedToNext() {
+    switch (_currentStep) {
+      case 0: // Type de mission
+        return _selectedCategory != null;
+      case 1: // Priorité & Planification (fusionnés)
+        // Vérifier priorité, risque et planification
+        bool hasBasicInfo = _selectedPriority != null && _selectedRisk != null;
+        if (!_isImmediateDeparture) {
+          return hasBasicInfo && _scheduledDate != null && _scheduledTime != null;
+        }
+        return hasBasicInfo;
+      case 2: // Localisation
+        if (_selectedCategory == MissionCategory.autres) {
+          return _selectedDeparture != null && _selectedArrival != null;
+        }
+        return _selectedArrival != null;
+      default:
+        return false;
+    }
+  }
+
+  Future<void> _submitMission() async {
+    setState(() => _isLoading = true);
+    HapticFeedback.mediumImpact();
 
     try {
+      // Calculer la date de début selon la planification
+      DateTime startDate;
+      if (_isImmediateDeparture) {
+        startDate = DateTime.now();
+      } else {
+        startDate = DateTime(
+          _scheduledDate!.year,
+          _scheduledDate!.month,
+          _scheduledDate!.day,
+          _scheduledTime!.hour,
+          _scheduledTime!.minute,
+        );
+      }
+      
+      // Générer automatiquement le titre basé sur la catégorie
+      String autoTitle = 'Mission ${_selectedCategory.label} - ${DateTime.now().day}/${DateTime.now().month}';
+      
       final mission = Mission(
-        poids: double.parse(_poidsController.text),
-        risque: int.parse(_risqueController.text),
-        typeCargaison: _selectedTypeCargaison!.value,
-        statut: 'en_attente',
-        latitudeDepart: double.parse(_latitudeDepartController.text),
-        longitudeDepart: double.parse(_longitudeDepartController.text),
-        latitudeArrivee: double.parse(_latitudeArriveeController.text),
-        longitudeArrivee: double.parse(_longitudeArriveeController.text),
-        description: _descriptionController.text.isEmpty
-            ? null
-            : _descriptionController.text,
-        destinataire: _destinataireController.text.isEmpty
-            ? null
-            : _destinataireController.text,
-        telephoneContact: _telephoneController.text.isEmpty
-            ? null
-            : _telephoneController.text,
+        title: autoTitle,
+        category: _selectedCategory,
+        priority: _selectedPriority,
+        status: MissionStatus.pending,
+        risk: _selectedRisk,
+        location: _selectedArrival ?? 'Non défini',
+        description: 'Mission automatique de ${_selectedCategory.label.toLowerCase()}',
+        estimatedDuration: null,
+        weight: null,
+        startDate: startDate,
+        departure: _selectedDeparture ?? 'Non défini',
+        arrival: _selectedArrival ?? 'Non défini',
+        createdAt: DateTime.now(),
       );
 
-      final createdMission = await _apiService.createMission(mission);
-
+      await _apiService.createMission(mission);
+      
       if (mounted) {
+        // Afficher un message de succès
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Mission créée avec succès (ID: ${createdMission.missionId})',
-                    style: const TextStyle(fontWeight: FontWeight.w500),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
                   ),
+                  child: const Icon(
+                    Icons.check_circle_rounded,
+                    color: Colors.green,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Mission créée avec succès !',
+                  style: TextStyle(fontWeight: FontWeight.w600),
                 ),
               ],
             ),
-            backgroundColor: Colors.green.shade600,
+            backgroundColor: Theme.of(context).cardColor,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            duration: const Duration(seconds: 3),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            margin: const EdgeInsets.all(16),
           ),
         );
-
-        // Réinitialiser le formulaire
-        _formKey.currentState!.reset();
+        
+        // Réinitialiser le formulaire et revenir à la première étape
         setState(() {
-          _selectedTypeCargaison = null;
+          _currentStep = 0;
+          _selectedCategory = MissionCategory.pochesSang;
+          _selectedPriority = Priority.medium;
+          _selectedRisk = Risk.low;
+          _selectedDeparture = null;
+          _selectedArrival = null;
+          _isImmediateDeparture = true;
+          _scheduledDate = null;
+          _scheduledTime = null;
         });
-        _poidsController.clear();
-        _risqueController.clear();
-        _latitudeDepartController.clear();
-        _longitudeDepartController.clear();
-        _latitudeArriveeController.clear();
-        _longitudeArriveeController.clear();
-        _descriptionController.clear();
-        _destinataireController.clear();
-        _telephoneController.clear();
+        _pageController.animateToPage(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text('Erreur: ${e.toString().split('\n').first}')),
-              ],
-            ),
-            backgroundColor: Colors.red.shade600,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            duration: const Duration(seconds: 5),
+            content: Text('Erreur lors de la création: $e'),
+            backgroundColor: Colors.red,
           ),
         );
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Nouvelle Mission'),
+        backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1E293B),
+        toolbarHeight: 0, // Masquer complètement l'AppBar
+        automaticallyImplyLeading: false, // Pas de flèche de retour
       ),
-      body: Form(
-        key: _formKey,
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildWelcomeHeader(),
-                    const SizedBox(height: 32),
-                    _buildMaterialSection(),
-                    const SizedBox(height: 24),
-                    _buildRisqueSection(),
-                    const SizedBox(height: 24),
-                    _buildWeightSection(),
-                    const SizedBox(height: 24),
-                    _buildLocationSection(),
-                    const SizedBox(height: 24),
-                    _buildContactSection(),
-                    const SizedBox(height: 24),
-                    _buildDescriptionSection(),
-                    const SizedBox(height: 100), // Espace pour le bouton flottant
-                  ],
-                ),
-              ),
+      body: Column(
+        children: [
+          // Indicateur de progression
+          Container(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16), // Ajout de padding top
+            child: Row(
+              children: List.generate(_stepTitles.length, (index) {
+                final isCompleted = index < _currentStep;
+                final isCurrent = index == _currentStep;
+                
+                return Expanded(
+                  child: Container(
+                    height: 4,
+                    margin: EdgeInsets.only(right: index < _stepTitles.length - 1 ? 8 : 0),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(2),
+                      color: isCompleted || isCurrent
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.outline.withOpacity(0.2),
+                    ),
+                  ),
+                );
+              }),
             ),
-          ],
-        ),
+          ),
+          
+          // Contenu des étapes
+          Expanded(
+            child: PageView(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(), // Empêche le swipe manuel
+              children: [
+                _buildCategoryStep(theme),
+                _buildPriorityPlanificationStep(theme),
+                _buildLocationStep(theme),
+              ],
+            ),
+          ),
+          
+          // Boutons de navigation
+          Container(
+            padding: const EdgeInsets.all(24),
+            child: Row(
+              children: [
+                if (_currentStep > 0)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _previousStep,
+                      icon: const Icon(Icons.arrow_back_ios_rounded),
+                      label: const Text('Précédent'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (_currentStep > 0) const SizedBox(width: 16),
+                
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _canProceedToNext() 
+                        ? (_currentStep == _stepTitles.length - 1 ? _submitMission : _nextStep)
+                        : null,
+                    icon: Icon(_currentStep == _stepTitles.length - 1 
+                        ? Icons.check_rounded 
+                        : Icons.arrow_forward_ios_rounded),
+                    label: Text(_currentStep == _stepTitles.length - 1 
+                        ? 'Créer Mission' 
+                        : 'Suivant'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: theme.colorScheme.onPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
-      floatingActionButton: _buildSubmitButton(),
     );
   }
 
-  Widget _buildWelcomeHeader() {
+  // Étape 1: Sélection du type de mission
+  Widget _buildCategoryStep(ThemeData theme) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildCategorySection(theme),
+        ],
+      ),
+    );
+  }
+
+  // Étape 2: Priorité, Risque et Planification
+  Widget _buildPriorityPlanificationStep(ThemeData theme) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildPriorityAndRiskSection(theme),
+          const SizedBox(height: 32),
+          _buildPlanificationSection(theme),
+        ],
+      ),
+    );
+  }
+
+  // Étape 3: Localisation
+  Widget _buildLocationStep(ThemeData theme) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildLocationSection(theme),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(ThemeData theme) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -209,26 +449,34 @@ class _AddMissionPageState extends State<AddMissionPage> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Theme.of(context).colorScheme.primary,
-            Theme.of(context).colorScheme.primary.withOpacity(0.8),
+            theme.colorScheme.primary.withOpacity(0.1),
+            theme.colorScheme.secondary.withOpacity(0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
-            offset: const Offset(0, 8),
-            blurRadius: 24,
-          ),
-        ],
+        border: Border.all(
+          color: theme.colorScheme.primary.withOpacity(0.1),
+        ),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              gradient: LinearGradient(
+                colors: [
+                  theme.colorScheme.primary,
+                  theme.colorScheme.secondary,
+                ],
+              ),
               borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.colorScheme.primary.withOpacity(0.3),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: const Icon(
               Icons.add_task_rounded,
@@ -236,25 +484,25 @@ class _AddMissionPageState extends State<AddMissionPage> {
               size: 32,
             ),
           ),
-          const SizedBox(width: 16),
-          const Expanded(
+          const SizedBox(width: 20),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Mission d\'urgence',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+                  'Nouvelle Mission',
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -1.0,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  'Créez une nouvelle mission de livraison critique par drone',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
+                  'Créez et planifiez une mission drone',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.7),
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -265,338 +513,787 @@ class _AddMissionPageState extends State<AddMissionPage> {
     );
   }
 
-  Widget _buildMaterialSection() {
+  Widget _buildCategorySection(ThemeData theme) {
     return _buildSection(
-      'Type de matériel',
-      Icons.inventory_2_rounded,
-      Theme.of(context).colorScheme.primary,
-      [
-        const Text(
-          'Sélectionnez le type de matériel à livrer',
-          style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+      theme: theme,
+      title: 'Catégorie de Mission',
+      icon: Icons.medical_services_rounded,
+      children: [
+        Text(
+          'Sélectionnez le type de mission à effectuer',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurface.withOpacity(0.6),
+          ),
         ),
         const SizedBox(height: 16),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-        children: TypeCargaison.values.map((type) {
-          final isSelected = _selectedTypeCargaison == type;
-          return GestureDetector(
-            onTap: () => setState(() => _selectedTypeCargaison = type),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: isSelected 
-                      ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
-                      : Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isSelected 
-                        ? Theme.of(context).colorScheme.primary 
-                        : Colors.grey.shade300,
-                    width: isSelected ? 2 : 1,
-                  ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            // Calculer dynamiquement le nombre de colonnes et la taille optimale
+            double availableWidth = constraints.maxWidth - 24; // Marge totale
+            double minItemWidth = 120; // Largeur minimale pour chaque élément
+            double maxItemWidth = 180; // Largeur maximale pour chaque élément
+            
+            int crossAxisCount = (availableWidth / minItemWidth).floor();
+            crossAxisCount = crossAxisCount.clamp(2, 6); // Entre 2 et 6 colonnes
+            
+            // Calculer la largeur réelle de chaque élément
+            double spacing = 12;
+            double totalSpacing = (crossAxisCount - 1) * spacing;
+            double itemWidth = (availableWidth - totalSpacing) / crossAxisCount;
+            
+            // Limiter la largeur si elle dépasse le maximum
+            if (itemWidth > maxItemWidth) {
+              itemWidth = maxItemWidth;
+              double totalItemsWidth = crossAxisCount * itemWidth + totalSpacing;
+              availableWidth = totalItemsWidth;
+            }
+            
+            // Calculer l'aspect ratio dynamique pour éviter le débordement
+            double aspectRatio = itemWidth / (itemWidth * 0.95); // Hauteur légèrement plus grande
+            
+            return Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: availableWidth,
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _getTypeIcon(type),
-                      color: isSelected 
-                          ? Theme.of(context).colorScheme.primary
-                          : Colors.grey.shade600,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      type.label,
-                      style: TextStyle(
-                        color: isSelected 
-                            ? Theme.of(context).colorScheme.primary
-                            : Colors.grey.shade700,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                child: GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    childAspectRatio: aspectRatio,
+                    crossAxisSpacing: spacing,
+                    mainAxisSpacing: spacing,
+                  ),
+                  itemCount: MissionCategory.values.length,
+          itemBuilder: (context, index) {
+            final category = MissionCategory.values[index];
+            final isSelected = _selectedCategory == category;
+            
+            return GestureDetector(
+              onTap: () {
+                setState(() => _selectedCategory = category);
+                HapticFeedback.lightImpact();
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.outline.withOpacity(0.12),
+                    width: isSelected ? 3 : 1,
+                  ),
+                  boxShadow: [
+                    if (isSelected) ...[
+                      BoxShadow(
+                        color: theme.colorScheme.primary.withOpacity(0.15),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                        spreadRadius: 0,
                       ),
-                    ),
+                    ] else ...[
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
                   ],
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(itemWidth > 150 ? 12 : 8),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Icône
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        padding: EdgeInsets.all(itemWidth > 150 ? 10 : 8),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surface.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(itemWidth > 150 ? 16 : 14),
+                        ),
+                        child: AnimatedScale(
+                          scale: isSelected ? 1.05 : 1.0,
+                          duration: const Duration(milliseconds: 200),
+                          child: Icon(
+                            category.icon,
+                            size: itemWidth > 150 ? 24 : 20,
+                            color: category.color,
+                          ),
+                        ),
+                      ),
+                      
+                      SizedBox(height: itemWidth > 150 ? 8 : 6),
+                      
+                      // Nom de la catégorie
+                      Flexible(
+                        child: AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 200),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withOpacity(0.8),
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                            fontSize: itemWidth > 150 
+                                ? (isSelected ? 13 : 12)
+                                : (isSelected ? 12 : 11),
+                            letterSpacing: 0.2,
+                          ) ?? const TextStyle(),
+                          child: Text(
+                            category.label,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
-          }).toList(),
+          },
+                ),
+              ),
+            );
+          },
         ),
       ],
     );
   }
 
-  Widget _buildRisqueSection() {
+  Widget _buildPriorityAndRiskSection(ThemeData theme) {
     return _buildSection(
-      'Niveau de risque',
-      Icons.warning_amber_rounded,
-      const Color(0xFFDC2626),
-      [
-        const Text(
-          'Définissez le niveau de risque de cette mission (1-5)',
-          style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+      theme: theme,
+      title: 'Priorité et Niveau de Risque',
+      icon: Icons.priority_high_rounded,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Priorité',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<Priority>(
+                    value: _selectedPriority,
+                    decoration: InputDecoration(
+                      prefixIcon: Container(
+                        margin: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: _selectedPriority.color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.flag_rounded,
+                          color: _selectedPriority.color,
+                          size: 16,
+                        ),
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    items: Priority.values.map((priority) {
+                      return DropdownMenuItem(
+                        value: priority,
+                        child: Text(
+                          priority.label,
+                          style: TextStyle(
+                            color: priority.color,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _selectedPriority = value);
+                        HapticFeedback.lightImpact();
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Niveau de risque',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<Risk>(
+                    value: _selectedRisk,
+                    decoration: InputDecoration(
+                      prefixIcon: Container(
+                        margin: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: _selectedRisk.color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.warning_rounded,
+                          color: _selectedRisk.color,
+                          size: 16,
+                        ),
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    items: Risk.values.map((risk) {
+                      return DropdownMenuItem(
+                        value: risk,
+                        child: Text(
+                          risk.label,
+                          style: TextStyle(
+                            color: risk.color,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _selectedRisk = value);
+                        HapticFeedback.lightImpact();
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _risqueController,
-          decoration: const InputDecoration(
-            labelText: 'Niveau de risque',
-            hintText: 'Entrez un niveau de 1 à 5',
-            prefixIcon: Icon(Icons.trending_up),
+      ],
+    );
+  }
+
+  Widget _buildLocationSection(ThemeData theme) {
+    return _buildSection(
+      theme: theme,
+      title: 'Localisation',
+      icon: Icons.location_on_rounded,
+      children: [
+        // Point de départ (seulement si "Autres" est sélectionné)
+        if (_selectedCategory == MissionCategory.autres) ...[
+          Text(
+            'Point de départ',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          keyboardType: TextInputType.number,
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Veuillez entrer un niveau de risque';
-            }
-            final risque = int.tryParse(value);
-            if (risque == null || risque < 1 || risque > 5) {
-              return 'Le niveau de risque doit être entre 1 et 5';
-            }
-            return null;
-          },
-        ),
-        if (_risqueController.text.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _selectedDeparture,
+                  hint: const Text('Sélectionner un lieu'),
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.flight_takeoff_rounded),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  items: _lieux.map((lieu) {
+                    return DropdownMenuItem(
+                      value: lieu,
+                      child: Text(lieu),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() => _selectedDeparture = value);
+                  },
+                  validator: (value) {
+                    if (_selectedCategory == MissionCategory.autres && value == null) {
+                      return 'Veuillez sélectionner un point de départ';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: theme.colorScheme.primary.withOpacity(0.3),
+                  ),
+                ),
+                child: IconButton(
+                  onPressed: () async {
+                    HapticFeedback.lightImpact();
+                    await _getCurrentLocation();
+                    if (_currentPosition != null) {
+                      setState(() {
+                        _selectedDeparture = _currentPosition;
+                      });
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Position actuelle utilisée comme point de départ')),
+                        );
+                      }
+                    }
+                  },
+                  icon: Icon(
+                    Icons.gps_fixed_rounded,
+                    color: theme.colorScheme.primary,
+                  ),
+                  tooltip: 'Utiliser ma position',
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
+        ],
+        
+        // Point d'arrivée
+        Text(
+          "Point d'arrivée",
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: _selectedArrival,
+                hint: const Text('Sélectionner un lieu'),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.flight_land_rounded),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                items: _lieux.map((lieu) {
+                  return DropdownMenuItem(
+                    value: lieu,
+                    child: Text(lieu),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() => _selectedArrival = value);
+                },
+                validator: (value) => value == null ? "Veuillez sélectionner un point d'arrivée" : null,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withOpacity(0.3),
+                ),
+              ),
+              child: IconButton(
+                onPressed: () async {
+                  HapticFeedback.lightImpact();
+                  await _getCurrentLocation();
+                  if (_currentPosition != null) {
+                    setState(() {
+                      _selectedArrival = _currentPosition;
+                    });
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Position actuelle utilisée comme point d'arrivée")),
+                      );
+                    }
+                  }
+                },
+                icon: Icon(
+                  Icons.gps_fixed_rounded,
+                  color: theme.colorScheme.primary,
+                ),
+                tooltip: 'Utiliser ma position',
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPlanificationSection(ThemeData theme) {
+    return _buildSection(
+      theme: theme,
+      title: 'Planification',
+      icon: Icons.schedule_rounded,
+      children: [
+        // Option départ immédiat
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _isImmediateDeparture = true;
+              _scheduledDate = null;
+              _scheduledTime = null;
+            });
+            HapticFeedback.lightImpact();
+          },
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+              color: _isImmediateDeparture 
+                  ? theme.colorScheme.primary.withOpacity(0.15)
+                  : theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _isImmediateDeparture
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.outline.withOpacity(0.2),
+                width: _isImmediateDeparture ? 2 : 1,
+              ),
             ),
             child: Row(
               children: [
                 Icon(
-                  Icons.info_outline,
-                  color: Theme.of(context).colorScheme.primary,
-                  size: 20,
+                  Icons.flash_on_rounded,
+                  color: _isImmediateDeparture 
+                      ? theme.colorScheme.primary 
+                      : theme.colorScheme.onSurface.withOpacity(0.6),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  _getRisqueDescription(int.tryParse(_risqueController.text) ?? 0),
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w500,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Départ immédiat',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: _isImmediateDeparture 
+                              ? theme.colorScheme.primary 
+                              : theme.colorScheme.onSurface,
+                        ),
+                      ),
+                      Text(
+                        'Mission programmée pour un départ le plus rapidement possible',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                if (_isImmediateDeparture)
+                  Icon(
+                    Icons.check_circle,
+                    color: theme.colorScheme.primary,
+                  ),
               ],
             ),
+          ),
+        ),
+        
+        const SizedBox(height: 12),
+        
+        // Option départ programmé
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _isImmediateDeparture = false;
+              _scheduledDate = DateTime.now();
+              _scheduledTime = TimeOfDay.now();
+            });
+            HapticFeedback.lightImpact();
+          },
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: !_isImmediateDeparture 
+                  ? theme.colorScheme.primary.withOpacity(0.15)
+                  : theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: !_isImmediateDeparture
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.outline.withOpacity(0.2),
+                width: !_isImmediateDeparture ? 2 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.schedule_rounded,
+                  color: !_isImmediateDeparture 
+                      ? theme.colorScheme.primary 
+                      : theme.colorScheme.onSurface.withOpacity(0.6),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Départ programmé',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: !_isImmediateDeparture 
+                              ? theme.colorScheme.primary 
+                              : theme.colorScheme.onSurface,
+                        ),
+                      ),
+                      Text(
+                        'Choisir une date et heure spécifiques',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!_isImmediateDeparture)
+                  Icon(
+                    Icons.check_circle,
+                    color: theme.colorScheme.primary,
+                  ),
+              ],
+            ),
+          ),
+        ),
+        
+        // Sélection date/heure si programmé
+        if (!_isImmediateDeparture) ...[
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              // Sélection date
+              Expanded(
+                child: GestureDetector(
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: _scheduledDate ?? DateTime.now(),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 30)),
+                    );
+                    if (date != null) {
+                      setState(() => _scheduledDate = date);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: theme.colorScheme.outline.withOpacity(0.2),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today,
+                          color: theme.colorScheme.primary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _scheduledDate != null
+                                ? '${_scheduledDate!.day}/${_scheduledDate!.month}/${_scheduledDate!.year}'
+                                : 'Choisir date',
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              
+              const SizedBox(width: 12),
+              
+              // Sélection heure
+              Expanded(
+                child: GestureDetector(
+                  onTap: () async {
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime: _scheduledTime ?? TimeOfDay.now(),
+                    );
+                    if (time != null) {
+                      setState(() => _scheduledTime = time);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: theme.colorScheme.outline.withOpacity(0.2),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.access_time,
+                          color: theme.colorScheme.primary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _scheduledTime != null
+                                ? '${_scheduledTime!.hour.toString().padLeft(2, '0')}:${_scheduledTime!.minute.toString().padLeft(2, '0')}'
+                                : 'Choisir heure',
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ],
     );
   }
 
-  Widget _buildWeightSection() {
+  Widget _buildDetailsSection(ThemeData theme) {
     return _buildSection(
-      'Poids du matériel',
-      Icons.scale_rounded,
-      const Color(0xFF059669),
-      [
-        const Text(
-          'Spécifiez le poids pour l\'attribution du drone',
-          style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _poidsController,
-          decoration: const InputDecoration(
-            labelText: 'Poids en kilogrammes *',
-            prefixIcon: Icon(Icons.scale_rounded),
-            suffixText: 'kg',
-            hintText: 'Ex: 2.5',
-          ),
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-          ],
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Poids requis';
-            }
-            final weight = double.tryParse(value);
-            if (weight == null || weight <= 0) {
-              return 'Poids invalide';
-            }
-            if (weight > 50) {
-              return 'Poids maximum: 50 kg';
-            }
-            return null;
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLocationSection() {
-    return Column(
+      theme: theme,
+      title: 'Planification',
+      icon: Icons.schedule_rounded,
       children: [
-        // Point de départ
-        GpsPointSelector(
-          title: 'Point de départ',
-          color: Colors.blue,
-          icon: Icons.flight_takeoff_rounded,
-          initialLatitude: _latitudeDepartController.text.isNotEmpty 
-              ? double.tryParse(_latitudeDepartController.text) 
-              : null,
-          initialLongitude: _longitudeDepartController.text.isNotEmpty 
-              ? double.tryParse(_longitudeDepartController.text) 
-              : null,
-          onPointSelected: (lat, lng, name) {
-            setState(() {
-              _latitudeDepartController.text = lat.toString();
-              _longitudeDepartController.text = lng.toString();
-            });
+        GestureDetector(
+          onTap: () async {
+            final date = await showDatePicker(
+              context: context,
+              initialDate: _startDate ?? DateTime.now(),
+              firstDate: DateTime.now(),
+              lastDate: DateTime.now().add(const Duration(days: 365)),
+            );
+            
+            if (date != null) {
+              final time = await showTimePicker(
+                context: context,
+                initialTime: TimeOfDay.now(),
+              );
+              
+              if (time != null) {
+                setState(() {
+                  _startDate = DateTime(
+                    date.year,
+                    date.month,
+                    date.day,
+                    time.hour,
+                    time.minute,
+                  );
+                });
+                HapticFeedback.lightImpact();
+              }
+            }
           },
-        ),
-        const SizedBox(height: 24),
-        
-        // Point d'arrivée
-        GpsPointSelector(
-          title: 'Point d\'arrivée',
-          color: Colors.green,
-          icon: Icons.flight_land_rounded,
-          initialLatitude: _latitudeArriveeController.text.isNotEmpty 
-              ? double.tryParse(_latitudeArriveeController.text) 
-              : null,
-          initialLongitude: _longitudeArriveeController.text.isNotEmpty 
-              ? double.tryParse(_longitudeArriveeController.text) 
-              : null,
-          onPointSelected: (lat, lng, name) {
-            setState(() {
-              _latitudeArriveeController.text = lat.toString();
-              _longitudeArriveeController.text = lng.toString();
-            });
-          },
-        ),
-        
-        // Validation cachée pour les coordonnées
-        Offstage(
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _latitudeDepartController,
-                validator: (value) {
-                  if (value == null || value.isEmpty) return 'Point de départ requis';
-                  final lat = double.tryParse(value);
-                  if (lat == null || lat < -90 || lat > 90) {
-                    return 'Latitude de départ invalide';
-                  }
-                  return null;
-                },
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: _startDate != null
+                  ? theme.colorScheme.primary.withOpacity(0.1)
+                  : theme.cardColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: _startDate != null
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.outline.withOpacity(0.2),
+                width: _startDate != null ? 2 : 1,
               ),
-              TextFormField(
-                controller: _longitudeDepartController,
-                validator: (value) {
-                  if (value == null || value.isEmpty) return 'Point de départ requis';
-                  final lng = double.tryParse(value);
-                  if (lng == null || lng < -180 || lng > 180) {
-                    return 'Longitude de départ invalide';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _latitudeArriveeController,
-                validator: (value) {
-                  if (value == null || value.isEmpty) return 'Point d\'arrivée requis';
-                  final lat = double.tryParse(value);
-                  if (lat == null || lat < -90 || lat > 90) {
-                    return 'Latitude d\'arrivée invalide';
-                  }
-                  return null;
-                },
-              ),
-              TextFormField(
-                controller: _longitudeArriveeController,
-                validator: (value) {
-                  if (value == null || value.isEmpty) return 'Point d\'arrivée requis';
-                  final lng = double.tryParse(value);
-                  if (lng == null || lng < -180 || lng > 180) {
-                    return 'Longitude d\'arrivée invalide';
-                  }
-                  return null;
-                },
-              ),
-            ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.event_rounded,
+                    color: theme.colorScheme.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Date et heure de début',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _startDate != null
+                            ? '${_startDate!.day}/${_startDate!.month}/${_startDate!.year} à ${_startDate!.hour}:${_startDate!.minute.toString().padLeft(2, '0')}'
+                            : 'Tapez pour sélectionner',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: _startDate != null
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: theme.colorScheme.onSurface.withOpacity(0.4),
+                ),
+              ],
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildContactSection() {
-    return _buildSection(
-      'Informations de contact',
-      Icons.contact_phone_rounded,
-      const Color(0xFFF59E0B),
-      [
-        const Text(
-          'Coordonnées du destinataire (optionnel)',
-          style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _destinataireController,
-          decoration: const InputDecoration(
-            labelText: 'Nom du destinataire',
-            prefixIcon: Icon(Icons.person_rounded),
-            hintText: 'Dr. Martin Dubois',
-          ),
-          textCapitalization: TextCapitalization.words,
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _telephoneController,
-          decoration: const InputDecoration(
-            labelText: 'Téléphone de contact',
-            prefixIcon: Icon(Icons.phone_rounded),
-            hintText: '+33 6 12 34 56 78',
-          ),
-          keyboardType: TextInputType.phone,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDescriptionSection() {
-    return _buildSection(
-      'Description de la mission',
-      Icons.description_rounded,
-      const Color(0xFF8B5CF6),
-      [
-        const Text(
-          'Ajoutez des détails supplémentaires (optionnel)',
-          style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _descriptionController,
-          decoration: const InputDecoration(
-            labelText: 'Informations supplémentaires',
-            hintText: 'Patient en arrêt cardiaque, livraison urgente...',
-            alignLabelWithHint: true,
-          ),
-          maxLines: 4,
-          textCapitalization: TextCapitalization.sentences,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSection(String title, IconData icon, Color color, List<Widget> children) {
+  Widget _buildSection({
+    required ThemeData theme,
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            offset: const Offset(0, 4),
-            blurRadius: 12,
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -606,20 +1303,22 @@ class _AddMissionPageState extends State<AddMissionPage> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(16),
+                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, color: color, size: 24),
+                child: Icon(
+                  icon,
+                  color: theme.colorScheme.primary,
+                  size: 20,
+                ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -631,84 +1330,96 @@ class _AddMissionPageState extends State<AddMissionPage> {
     );
   }
 
-  Widget _buildSubmitButton() {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      child: FloatingActionButton.extended(
-        onPressed: _isLoading ? null : _submitForm,
-        backgroundColor: _isLoading 
-            ? Colors.grey.shade400 
-            : Theme.of(context).colorScheme.primary,
-        elevation: 8,
-        extendedPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-        label: _isLoading
-            ? const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  Text('Création en cours...'),
-                ],
-              )
-            : const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.send_rounded),
-                  SizedBox(width: 8),
-                  Text(
-                    'Créer la mission',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    String? Function(String?)? validator,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    int maxLines = 1,
+  }) {
+    return TextFormField(
+      controller: controller,
+      validator: validator,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: Container(
+          margin: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: Theme.of(context).colorScheme.primary,
+            size: 20,
+          ),
+        ),
       ),
     );
   }
 
-  IconData _getTypeIcon(TypeCargaison type) {
-    switch (type) {
-      case TypeCargaison.pocheSang:
-        return Icons.bloodtype_rounded;
-      case TypeCargaison.defibrillateur:
-        return Icons.monitor_heart_rounded;
-      case TypeCargaison.medicament:
-        return Icons.medication_rounded;
-      case TypeCargaison.pieceMecanique:
-        return Icons.build_rounded;
-      case TypeCargaison.fragile:
-        return Icons.warning_rounded;
-      case TypeCargaison.perissable:
-        return Icons.access_time_rounded;
-      case TypeCargaison.autre:
-        return Icons.inventory_2_rounded;
-    }
-  }
-
-  String _getRisqueDescription(int risque) {
-    switch (risque) {
-      case 1:
-        return 'Très faible';
-      case 2:
-        return 'Faible';
-      case 3:
-        return 'Moyen';
-      case 4:
-        return 'Élevé';
-      case 5:
-        return 'Critique';
-      default:
-        return 'Non défini';
-    }
+  Widget _buildSubmitButton(ThemeData theme) {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              theme.colorScheme.primary,
+              theme.colorScheme.secondary,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: theme.colorScheme.primary.withOpacity(0.3),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ElevatedButton.icon(
+          onPressed: _isLoading ? null : _submitMission,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
+          icon: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    strokeWidth: 2,
+                  ),
+                )
+              : const Icon(
+                  Icons.add_task_rounded,
+                  color: Colors.white,
+                ),
+          label: Text(
+            _isLoading ? 'Création...' : 'Créer la mission',
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

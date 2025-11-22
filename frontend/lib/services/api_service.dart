@@ -253,6 +253,47 @@ class ApiService {
     }
   }
 
+  Future<Mission> updateMission(int id, Mission mission) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/missions/$id'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode(mission.toJson()),
+      );
+
+      if (response.statusCode == 200) {
+        return Mission.fromJson(json.decode(response.body));
+      } else {
+        throw Exception(
+          'Erreur lors de la mise à jour de la mission: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Erreur de connexion au serveur: $e');
+    }
+  }
+
+  Future<void> deleteMission(int id) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/api/missions/$id'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode != 204 && response.statusCode != 200) {
+        throw Exception(
+          'Erreur lors de la suppression de la mission: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Erreur de connexion au serveur: $e');
+    }
+  }
+
   Future<List<HistoriqueMission>> getHistoriqueByDrone(int droneId) async {
     try {
       final response = await http.get(
